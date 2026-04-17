@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# Data files — do NOT commit CSV data to the repo
+Data/
+*.csv
+
+# Checkpoint files
+unicorn_optimize_checkpoint.csv
+unicorn_optimize_checkpoint_meta.json
+
+# Secrets — NEVER commit these
+*.json
+!package.json
+service_account*.json
+credentials*.json
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

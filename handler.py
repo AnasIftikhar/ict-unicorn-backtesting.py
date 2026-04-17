@@ -168,16 +168,15 @@ def handler(job):
                 eta_m    = int((remaining_est % 3600) // 60)
                 eta_s    = int(remaining_est % 60)
 
-                yield {
-                    "stage": "OPT",
-                    "msg": (
-                        f"  [{processed:>5,}/{len(worker_args):,}] "
-                        f"{pct:5.1f}%  |  "
-                        f"{rate:5.1f} combos/s  |  "
-                        f"Valid: {len(results_list):,}  |  "
-                        f"ETA: {eta_h:02d}h {eta_m:02d}m {eta_s:02d}s"
-                    )
-                }
+                msg = (
+                    f"  [{processed:>5,}/{len(worker_args):,}] "
+                    f"{pct:5.1f}%  |  "
+                    f"{rate:5.1f} combos/s  |  "
+                    f"Valid: {len(results_list):,}  |  "
+                    f"ETA: {eta_h:02d}h {eta_m:02d}m {eta_s:02d}s"
+                )
+                print(msg, flush=True)
+                yield {"stage": "OPT", "msg": msg}
 
     elapsed_total = (datetime.now() - start_time).total_seconds()
     h = int(elapsed_total // 3600)

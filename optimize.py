@@ -105,6 +105,7 @@ def init_worker(df_data, metric_mode, initial_balance):
     global_df              = df_data
     global_metric_mode     = metric_mode
     global_initial_balance = initial_balance
+    os.environ['TQDM_DISABLE'] = '1'
 
 
 def calculate_absolute_drawdown(equity_df, initial_balance):

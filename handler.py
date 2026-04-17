@@ -198,8 +198,7 @@ def handler(job):
     results_df   = results_df.sort_values("Sharpe Ratio", ascending=False)
     results_df.insert(0, "Rank", range(1, len(results_df) + 1))
 
-    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename      = f"{output_filename}_{symbol}_{interval}_{timestamp_str}.csv"
+    filename      = f"{symbol}-{interval}-{days_back}.csv"
     csv_bytes     = results_df.to_csv(index=False).encode("utf-8")
 
     drive_url = upload_to_google_drive(csv_bytes, filename, drive_folder_id)

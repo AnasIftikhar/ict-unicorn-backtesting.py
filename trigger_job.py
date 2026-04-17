@@ -24,6 +24,10 @@ import sys
 import time
 
 import requests
+from dotenv import load_dotenv
+
+# Load .env from the same directory as this script (gitignored, never committed)
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 # ── Credentials (override via env vars or CLI args) ──
 RUNPOD_API_KEY     = os.environ.get("RUNPOD_API_KEY",     "")

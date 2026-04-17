@@ -27,18 +27,18 @@ import requests
 
 # ── Credentials (override via env vars or CLI args) ──
 RUNPOD_API_KEY     = os.environ.get("RUNPOD_API_KEY",     "")
-RUNPOD_ENDPOINT_ID = os.environ.get("RUNPOD_ENDPOINT_ID", "")
+RUNPOD_ENDPOINT_ID = os.environ.get("RUNPOD_ENDPOINT_ID", "bu8gmsydjm6dre")
 
 # ── Default optimization parameters — matches optimize.py defaults ──
 DEFAULT_PAYLOAD = {
     # Data
-    "symbol":    "ETHUSDT.P",
-    "interval":  "3m",
+    "symbol":    "BTCUSDT.P",
+    "interval":  "5m",
     "days_back": 365,
 
     # Metrics
-    "metric_mode":     "basic",   # "basic" or "advanced"
-    "initial_balance": 100000,
+    "metric_mode":     "advanced",   # "basic" or "advanced"
+    "initial_balance": 1000,
 
     # Output
     "output_filename": "optimization_results",
@@ -86,16 +86,20 @@ def submit_job(payload: dict) -> str:
 
 def poll_job(job_id: str, poll_interval: int = 5) -> dict | None:
     """
-    Stream real-time progress from the generator handler.
-    Prints each progress update as it arrives — identical feel to optimize.py locally.
+    Poll job status and show live elapsed timer while running.
+    Prints any stream items (DATA/SETUP messages) if RunPod delivers them.
     Returns the final result dict on completion, None on failure.
     """
+    import sys
     stream_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/stream/{job_id}"
     status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
-    print(f"\nStreaming progress for job {job_id}...\n")
+    print(f"\nJob {job_id} submitted. Waiting for results...\n")
+    print("=" * 60)
 
-    seen_count  = 0
+    seen_count   = 0
     final_result = None
+    start_time   = time.time()
+    last_status  = None
 
     while True:
         resp = requests.get(stream_url, headers=_headers(), timeout=30)
@@ -103,28 +107,65 @@ def poll_job(job_id: str, poll_interval: int = 5) -> dict | None:
         data   = resp.json()
         status = data.get("status")
 
-        # Print any new stream items since last poll
+        # Print any new stream items (e.g. DATA/SETUP messages from handler)
         stream_items = data.get("stream", [])
-        for item in stream_items[seen_count:]:
-            output = item.get("output", {})
-            if "error" in output:
-                print(f"\nERROR: {output['error']}")
-            elif "msg" in output:
-                print(output["msg"])
-            elif "status" in output and output.get("status") == "complete":
-                final_result = output
+        new_items = stream_items[seen_count:]
+        if new_items:
+            sys.stdout.write("\r" + " " * 60 + "\r")  # clear timer line
+            for item in new_items:
+                output = item.get("output", {})
+                if "error" in output:
+                    print(f"\nERROR: {output['error']}")
+                elif "msg" in output:
+                    print(output["msg"])
+                elif "status" in output and output.get("status") == "complete":
+                    final_result = output
         seen_count = len(stream_items)
 
         if status == "COMPLETED":
-            # Fetch final output from status endpoint if not captured from stream
+            sys.stdout.write("\r" + " " * 60 + "\r")
             if final_result is None:
-                r2 = requests.get(status_url, headers=_headers(), timeout=30)
-                final_result = r2.json().get("output", {})
-            return final_result
+                # One extra stream fetch — the final yield may lag behind the
+                # COMPLETED status update by one polling cycle.
+                resp2      = requests.get(stream_url, headers=_headers(), timeout=30)
+                data2      = resp2.json()
+                remaining  = data2.get("stream", [])[seen_count:]
+                for item in remaining:
+                    output = item.get("output", {})
+                    if isinstance(output, dict) and output.get("status") == "complete":
+                        final_result = output
+                        break
+
+            if final_result is None:
+                # Final fallback: status endpoint.
+                # For generator handlers RunPod may return output as a list of
+                # all yielded items — find the one with status == "complete".
+                r2     = requests.get(status_url, headers=_headers(), timeout=30)
+                output = r2.json().get("output")
+                if isinstance(output, list):
+                    for item in reversed(output):
+                        if isinstance(item, dict) and item.get("status") == "complete":
+                            final_result = item
+                            break
+                elif isinstance(output, dict):
+                    final_result = output
+            return final_result or {}
 
         if status in ("FAILED", "CANCELLED", "TIMED_OUT"):
+            sys.stdout.write("\r" + " " * 60 + "\r")
             print(f"\nJob ended with status: {status}")
             return None
+
+        # Live elapsed timer
+        elapsed = int(time.time() - start_time)
+        h = elapsed // 3600
+        m = (elapsed % 3600) // 60
+        s = elapsed % 60
+        status_label = status or "PENDING"
+        if status_label != last_status:
+            last_status = status_label
+        sys.stdout.write(f"\r  [{status_label}]  Elapsed: {h:02d}h {m:02d}m {s:02d}s  |  Polling every {poll_interval}s...")
+        sys.stdout.flush()
 
         time.sleep(poll_interval)
 

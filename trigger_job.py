@@ -77,33 +77,53 @@ def _headers():
 
 def submit_job(payload: dict) -> str:
     """Submit a job to the RunPod endpoint. Returns the job ID."""
-    url  = f"https://api.runpod.io/v2/{RUNPOD_ENDPOINT_ID}/run"
+    url  = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
     resp = requests.post(url, headers=_headers(), json={"input": payload}, timeout=30)
     resp.raise_for_status()
     job_id = resp.json()["id"]
     return job_id
 
 
-def poll_job(job_id: str, poll_interval: int = 15) -> dict | None:
+def poll_job(job_id: str, poll_interval: int = 5) -> dict | None:
     """
-    Poll the job status until COMPLETED or FAILED.
-    Returns the output dict on success, None on failure.
+    Stream real-time progress from the generator handler.
+    Prints each progress update as it arrives — identical feel to optimize.py locally.
+    Returns the final result dict on completion, None on failure.
     """
-    url = f"https://api.runpod.io/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
-    print(f"\nPolling job {job_id}  (every {poll_interval}s)...")
+    stream_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/stream/{job_id}"
+    status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
+    print(f"\nStreaming progress for job {job_id}...\n")
+
+    seen_count  = 0
+    final_result = None
 
     while True:
-        resp = requests.get(url, headers=_headers(), timeout=30)
+        resp = requests.get(stream_url, headers=_headers(), timeout=30)
         resp.raise_for_status()
         data   = resp.json()
         status = data.get("status")
-        print(f"  [{time.strftime('%H:%M:%S')}] Status: {status}")
+
+        # Print any new stream items since last poll
+        stream_items = data.get("stream", [])
+        for item in stream_items[seen_count:]:
+            output = item.get("output", {})
+            if "error" in output:
+                print(f"\nERROR: {output['error']}")
+            elif "msg" in output:
+                print(output["msg"])
+            elif "status" in output and output.get("status") == "complete":
+                final_result = output
+        seen_count = len(stream_items)
 
         if status == "COMPLETED":
-            return data.get("output", {})
+            # Fetch final output from status endpoint if not captured from stream
+            if final_result is None:
+                r2 = requests.get(status_url, headers=_headers(), timeout=30)
+                final_result = r2.json().get("output", {})
+            return final_result
+
         if status in ("FAILED", "CANCELLED", "TIMED_OUT"):
             print(f"\nJob ended with status: {status}")
-            print(json.dumps(data, indent=2))
             return None
 
         time.sleep(poll_interval)

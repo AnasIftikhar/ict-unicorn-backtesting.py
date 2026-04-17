@@ -159,7 +159,7 @@ def handler(job):
     ) as pool:
         for result in pool.imap_unordered(run_single_backtest, worker_args):
             processed += 1
-            if result is not None:
+            if result is not None and 'Error' not in result:
                 results_list.append(result)
 
             # Stream progress every 10 combinations — mirrors optimize.py display
@@ -229,12 +229,12 @@ def handler(job):
             "slPercent":          best.get("slPercent"),
         },
         "best_metrics": {
-            "Return [%]":        round(float(best.get("Return [%]",        0)), 4),
-            "Sharpe Ratio":      round(float(best.get("Sharpe Ratio",      0)), 4),
-            "Max. Drawdown [%]": round(float(best.get("Max. Drawdown [%]", 0)), 4),
-            "# Trades":          int(best.get("# Trades", 0)),
-            "Win Rate [%]":      round(float(best.get("Win Rate [%]",      0)), 4),
-            "Profit Factor":     round(float(best.get("Profit Factor",     0)), 4),
+            "Return [%]":        round(float(best.get("Return [%]")        or 0), 4),
+            "Sharpe Ratio":      round(float(best.get("Sharpe Ratio")      or 0), 4),
+            "Max. Drawdown [%]": round(float(best.get("Max. Drawdown [%]") or 0), 4),
+            "# Trades":          int(  best.get("# Trades")                or 0),
+            "Win Rate [%]":      round(float(best.get("Win Rate [%]")      or 0), 4),
+            "Profit Factor":     round(float(best.get("Profit Factor")     or 0), 4),
         },
     }
 

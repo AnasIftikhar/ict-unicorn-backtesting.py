@@ -1,7 +1,7 @@
 backtesting==0.6.5
 pandas>=2.0.0,<3.0.0
 numpy>=1.24.0,<2.0.0
-pandas_ta==0.3.14b0
+pandas-ta==0.4.71b0
 runpod>=1.6.0
 google-api-python-client>=2.100.0
 google-auth>=2.23.0

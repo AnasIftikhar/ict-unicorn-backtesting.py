@@ -13,6 +13,10 @@ import importlib.util
 from multiprocessing import Pool, cpu_count
 from datetime import datetime
 
+# Suppress tqdm progress bars from FractionalBacktest.run in all worker processes.
+# Must be set in the main process before Pool fork so workers inherit it.
+os.environ['TQDM_DISABLE'] = '1'
+
 import numpy as np
 import pandas as pd
 

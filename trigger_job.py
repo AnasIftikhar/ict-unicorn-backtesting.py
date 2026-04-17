@@ -37,7 +37,7 @@ RUNPOD_ENDPOINT_ID = os.environ.get("RUNPOD_ENDPOINT_ID", "bu8gmsydjm6dre")
 DEFAULT_PAYLOAD = {
     # Data
     "symbol":    "BTCUSDT.P",
-    "interval":  "5m",
+    "interval":  "3m",
     "days_back": 365,
 
     # Metrics
@@ -225,7 +225,16 @@ def main():
 
     # Poll
     result = poll_job(job_id, poll_interval=args.poll_interval)
-    if result is None:
+    if not result:
+        print("\n" + "=" * 60)
+        print("JOB FINISHED — NO VALID RESULTS")
+        print("=" * 60)
+        print("  All combinations were filtered out (fewer than 20 trades each).")
+        print("  Possible causes:")
+        print("    - Too few bars loaded (check data download logs above)")
+        print("    - Strategy too selective for this symbol/timeframe")
+        print("    - Try a higher timeframe (5m/15m) or more days_back")
+        print("=" * 60)
         sys.exit(1)
 
     # Print summary

@@ -141,6 +141,7 @@ def handler(job):
             f"  Total combinations : {total_combinations:,}\n"
             f"  CPU cores          : {num_cores}\n"
             f"  Metric mode        : {metric_mode}\n"
+            f"  Bars loaded        : {len(df):,}\n"
             f"  Methods            : {tpsl_methods}\n"
             f"  fvgSensitivity     : {fvg_sensitivity_values}\n"
             f"  swingLength        : {swing_length_min}-{swing_length_max} step {swing_length_step}\n"
@@ -193,7 +194,11 @@ def handler(job):
     yield {"stage": "OPT", "msg": f"Optimization done in {h:02d}h {m:02d}m {s:02d}s  |  Valid results: {len(results_list):,}"}
 
     if not results_list:
-        yield {"error": "No valid results — all combinations had fewer than 20 trades"}
+        yield {"error": (
+            f"No valid results — all {total_combinations} combinations had fewer than 20 trades. "
+            f"Bars loaded: {len(df):,}. "
+            f"Try a higher timeframe (5m/15m), more days_back, or a different symbol."
+        )}
         return
 
     # ── 4. Process & export ───────────────────────────────────────────────

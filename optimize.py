@@ -698,9 +698,32 @@ if __name__ == '__main__':
     print("📈 PROCESSING RESULTS")
     print("=" * 60)
 
-    # Only fill numeric columns with 0 where appropriate — don't touch strings/booleans
+    # Fill NaN/None in numeric columns with 0.
+    # Note: columns that contain None in every row end up as object dtype and are
+    # excluded by select_dtypes, so we also explicitly fill known nullable metric cols.
     numeric_cols = all_results_df.select_dtypes(include=[np.number]).columns
     all_results_df[numeric_cols] = all_results_df[numeric_cols].fillna(0)
+    nullable_metric_cols = [
+        'Sortino Ratio', 'Calmar Ratio', 'Expectancy [%]',
+        'Best Trade [%]', 'Worst Trade [%]',
+        'Max. Absolute DD [%]', 'Avg Win / Avg Loss',
+        'Max Win Streak', 'Max Loss Streak',
+        'Long Win Rate [%]', 'Long PnL [%]',
+        'Short Win Rate [%]', 'Short PnL [%]',
+        'Winning Trades', 'Losing Trades',
+    ]
+    for col in nullable_metric_cols:
+        if col in all_results_df.columns:
+            all_results_df[col] = pd.to_numeric(all_results_df[col], errors='coerce').fillna(0)
+
+    # Debug: log any remaining None/NaN in metric columns so future issues are obvious
+    null_check = {
+        col: int(all_results_df[col].isna().sum())
+        for col in all_results_df.columns
+        if all_results_df[col].isna().any()
+    }
+    if null_check:
+        print(f"⚠️  Columns still containing NaN after fill (will show 0): {null_check}")
 
     # Sort by Sharpe Ratio (descending)
     all_results_df = all_results_df.sort_values('Sharpe Ratio', ascending=False)
@@ -752,21 +775,23 @@ if __name__ == '__main__':
         print(f"  tpPercent         : {best.get('tpPercent', 'N/A')}")
         print(f"  slPercent         : {best.get('slPercent', 'N/A')}")
         print("-" * 40)
-        print(f"  Return [%]        : {best.get('Return [%]', 0):.4f}")
-        print(f"  Sharpe Ratio      : {best.get('Sharpe Ratio', 0):.4f}")
-        print(f"  Sortino Ratio     : {best.get('Sortino Ratio', 0):.4f}")
-        print(f"  Max. Drawdown [%] : {best.get('Max. Drawdown [%]', 0):.4f}")
-        print(f"  # Trades          : {best.get('# Trades', 0):.0f}")
-        print(f"  Win Rate [%]      : {best.get('Win Rate [%]', 0):.4f}")
-        print(f"  Profit Factor     : {best.get('Profit Factor', 0):.4f}")
-        print(f"  Avg. Trade [%]    : {best.get('Avg. Trade [%]', 0):.4f}")
-        print(f"  Exposure Time [%] : {best.get('Exposure Time [%]', 0):.4f}")
+        # Use `or 0` instead of a default in .get() because .get('key', 0) returns None
+        # when the key exists with a None value — only missing keys trigger the default.
+        print(f"  Return [%]        : {(best.get('Return [%]') or 0):.4f}")
+        print(f"  Sharpe Ratio      : {(best.get('Sharpe Ratio') or 0):.4f}")
+        print(f"  Sortino Ratio     : {(best.get('Sortino Ratio') or 0):.4f}")
+        print(f"  Max. Drawdown [%] : {(best.get('Max. Drawdown [%]') or 0):.4f}")
+        print(f"  # Trades          : {(best.get('# Trades') or 0):.0f}")
+        print(f"  Win Rate [%]      : {(best.get('Win Rate [%]') or 0):.4f}")
+        print(f"  Profit Factor     : {(best.get('Profit Factor') or 0):.4f}")
+        print(f"  Avg. Trade [%]    : {(best.get('Avg. Trade [%]') or 0):.4f}")
+        print(f"  Exposure Time [%] : {(best.get('Exposure Time [%]') or 0):.4f}")
         if metric_mode == 'advanced':
-            print(f"  Abs. Drawdown [%] : {best.get('Max. Absolute DD [%]', 0):.4f}")
-            print(f"  Avg Win/Avg Loss  : {best.get('Avg Win / Avg Loss', 0):.4f}")
-            print(f"  Max Loss Streak   : {best.get('Max Loss Streak', 0):.0f}")
-            print(f"  Long Win Rate [%] : {best.get('Long Win Rate [%]', 0):.4f}")
-            print(f"  Short Win Rate [%]: {best.get('Short Win Rate [%]', 0):.4f}")
+            print(f"  Abs. Drawdown [%] : {(best.get('Max. Absolute DD [%]') or 0):.4f}")
+            print(f"  Avg Win/Avg Loss  : {(best.get('Avg Win / Avg Loss') or 0):.4f}")
+            print(f"  Max Loss Streak   : {(best.get('Max Loss Streak') or 0):.0f}")
+            print(f"  Long Win Rate [%] : {(best.get('Long Win Rate [%]') or 0):.4f}")
+            print(f"  Short Win Rate [%]: {(best.get('Short Win Rate [%]') or 0):.4f}")
 
         print("\n📋 To reproduce best result in unicorn.py:")
         print(f"   UnicornStrategy.tpslMethod         = '{best.get('tpslMethod', 'N/A')}'")

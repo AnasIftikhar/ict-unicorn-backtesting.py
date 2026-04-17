@@ -79,26 +79,30 @@ def handler(job):
     # ── Parse parameters ─────────────────────────────────────────────────
     symbol          = job_input.get("symbol",          "ETHUSDT.P")
     interval        = job_input.get("interval",        "3m")
-    days_back       = int(job_input.get("days_back",   365))
-    metric_mode     = job_input.get("metric_mode",     "basic")
-    initial_balance = float(job_input.get("initial_balance", 100_000))
-    drive_folder_id = job_input.get("drive_folder_id", None)
-    output_filename = job_input.get("output_filename", "optimization_results")
+    # NOTE: use `job_input.get(key) or default` instead of `job_input.get(key, default)`
+    # so that an explicit null value in the JSON payload falls back to the default too.
+    # dict.get(key, default) only uses default when the key is ABSENT; if the key is
+    # present with a null/None value, it returns None — causing float(None) TypeError.
+    days_back       = int(job_input.get("days_back")       or 365)
+    metric_mode     = job_input.get("metric_mode")         or "basic"
+    initial_balance = float(job_input.get("initial_balance") or 100_000)
+    drive_folder_id = job_input.get("drive_folder_id")     or None
+    output_filename = job_input.get("output_filename")     or "optimization_results"
 
-    fvg_sensitivity_values     = job_input.get("fvg_sensitivity_values",     ["Extreme", "High", "Normal", "Low"])
-    swing_length_min           = int(job_input.get("swing_length_min",       3))
-    swing_length_max           = int(job_input.get("swing_length_max",       10))
-    swing_length_step          = int(job_input.get("swing_length_step",      1))
-    require_retracement_values = job_input.get("require_retracement_values", [False])
-    tpsl_methods               = job_input.get("tpsl_methods",               ["Unicorn", "Dynamic"])
-    use_1to1rr_values          = job_input.get("use_1to1rr_values",          [True])
-    risk_amount_values         = job_input.get("risk_amount_values",         ["Highest", "High", "Normal", "Low", "Lowest"])
-    tp_percent_min             = float(job_input.get("tp_percent_min",       0.1))
-    tp_percent_max             = float(job_input.get("tp_percent_max",       1.0))
-    tp_percent_step            = float(job_input.get("tp_percent_step",      0.1))
-    sl_percent_min             = float(job_input.get("sl_percent_min",       0.1))
-    sl_percent_max             = float(job_input.get("sl_percent_max",       1.0))
-    sl_percent_step            = float(job_input.get("sl_percent_step",      0.1))
+    fvg_sensitivity_values     = job_input.get("fvg_sensitivity_values")     or ["Extreme", "High", "Normal", "Low"]
+    swing_length_min           = int(job_input.get("swing_length_min")       or 3)
+    swing_length_max           = int(job_input.get("swing_length_max")       or 10)
+    swing_length_step          = int(job_input.get("swing_length_step")      or 1)
+    require_retracement_values = job_input.get("require_retracement_values") or [False]
+    tpsl_methods               = job_input.get("tpsl_methods")               or ["Unicorn", "Dynamic"]
+    use_1to1rr_values          = job_input.get("use_1to1rr_values")          or [True]
+    risk_amount_values         = job_input.get("risk_amount_values")         or ["Highest", "High", "Normal", "Low", "Lowest"]
+    tp_percent_min             = float(job_input.get("tp_percent_min")       or 0.1)
+    tp_percent_max             = float(job_input.get("tp_percent_max")       or 1.0)
+    tp_percent_step            = float(job_input.get("tp_percent_step")      or 0.1)
+    sl_percent_min             = float(job_input.get("sl_percent_min")       or 0.1)
+    sl_percent_max             = float(job_input.get("sl_percent_max")       or 1.0)
+    sl_percent_step            = float(job_input.get("sl_percent_step")      or 0.1)
 
     # ── 1. Download data ──────────────────────────────────────────────────
     yield {"stage": "DATA", "msg": f"Downloading {symbol} {interval} ({days_back} days) from Binance Vision..."}
@@ -197,7 +201,13 @@ def handler(job):
 
     results_df   = pd.DataFrame(results_list)
     numeric_cols = results_df.select_dtypes(include=[np.number]).columns
-    results_df[numeric_cols] = results_df[numeric_cols].fillna(0)
+    # fillna(0) handles NaN; replace handles inf/-inf (e.g. Profit Factor = inf
+    # when there are no losing trades) — both would break JSON serialisation.
+    results_df[numeric_cols] = (
+        results_df[numeric_cols]
+        .fillna(0)
+        .replace([np.inf, -np.inf], 0)
+    )
     results_df   = results_df.sort_values("Sharpe Ratio", ascending=False)
     results_df.insert(0, "Rank", range(1, len(results_df) + 1))
 

@@ -208,6 +208,23 @@ def handler(job):
         .fillna(0)
         .replace([np.inf, -np.inf], 0)
     )
+    # Nullable metrics (Sortino, Calmar, etc.) store Python None, which makes pandas
+    # infer object dtype — select_dtypes misses them and fillna above skips them.
+    # Force-coerce them to numeric so they don't propagate as None into best_metrics.
+    nullable_metric_cols = [
+        'Return [%]', 'Sharpe Ratio', 'Max. Drawdown [%]',
+        'Win Rate [%]', 'Profit Factor', 'Avg. Trade [%]', 'Exposure Time [%]',
+        'Sortino Ratio', 'Calmar Ratio', 'Expectancy [%]',
+        'Best Trade [%]', 'Worst Trade [%]',
+        'Max. Absolute DD [%]', 'Avg Win / Avg Loss',
+        'Max Win Streak', 'Max Loss Streak',
+        'Long Win Rate [%]', 'Long PnL [%]',
+        'Short Win Rate [%]', 'Short PnL [%]',
+    ]
+    for col in nullable_metric_cols:
+        if col in results_df.columns:
+            results_df[col] = pd.to_numeric(results_df[col], errors='coerce').fillna(0).replace([np.inf, -np.inf], 0)
+
     results_df   = results_df.sort_values("Sharpe Ratio", ascending=False)
     results_df.insert(0, "Rank", range(1, len(results_df) + 1))
 
